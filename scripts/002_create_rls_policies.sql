@@ -1,4 +1,20 @@
--- Row Level Security Policies
+/*
+  # Row Level Security Policies
+
+  ## Security Philosophy
+  - Default deny: All tables start with RLS enabled and no access
+  - Principle of least privilege: Users only access what they need
+  - Content visibility: Published content is public, drafts are private
+  - Owner-only operations: Users can only modify their own content
+  - Collaborative features: Controlled sharing for playlists and events
+
+  ## Policy Categories
+  1. Profile and User Management - Public profiles, private settings
+  2. Music Content - Artist ownership, published content visibility
+  3. User Engagement - Public interactions, private preferences
+  4. Venues and Events - Public discovery, organizer control
+  5. Analytics - Owner-only insights, public metrics
+*/
 
 -- Profiles policies
 CREATE POLICY "profiles_select_all" ON public.profiles FOR SELECT USING (true);
@@ -18,9 +34,33 @@ CREATE POLICY "artists_delete_own" ON public.artists FOR DELETE USING (
   auth.uid() IN (SELECT id FROM public.profiles WHERE id = profile_id)
 );
 
+-- User roles policies
+CREATE POLICY "user_roles_select_all" ON public.user_roles FOR SELECT USING (true);
+CREATE POLICY "user_roles_insert_admin_only" ON public.user_roles FOR INSERT WITH CHECK (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+CREATE POLICY "user_roles_update_admin_only" ON public.user_roles FOR UPDATE USING (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+CREATE POLICY "user_roles_delete_admin_only" ON public.user_roles FOR DELETE USING (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+
+-- Genres policies (public reference data)
+CREATE POLICY "genres_select_all" ON public.genres FOR SELECT USING (true);
+CREATE POLICY "genres_insert_admin_only" ON public.genres FOR INSERT WITH CHECK (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+CREATE POLICY "genres_update_admin_only" ON public.genres FOR UPDATE USING (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+CREATE POLICY "genres_delete_admin_only" ON public.genres FOR DELETE USING (
+  auth.uid() IN (SELECT user_id FROM public.user_roles WHERE role = 'admin' AND is_active = true)
+);
+
 -- Albums policies
-CREATE POLICY "albums_select_published" ON public.albums FOR SELECT USING (
-  is_published = true OR 
+CREATE POLICY "albums_select_published_or_own" ON public.albums FOR SELECT USING (
+  status = 'published' OR
   auth.uid() IN (SELECT profile_id FROM public.artists WHERE id = artist_id)
 );
 CREATE POLICY "albums_insert_own" ON public.albums FOR INSERT WITH CHECK (
@@ -34,8 +74,8 @@ CREATE POLICY "albums_delete_own" ON public.albums FOR DELETE USING (
 );
 
 -- Tracks policies
-CREATE POLICY "tracks_select_published" ON public.tracks FOR SELECT USING (
-  is_published = true OR 
+CREATE POLICY "tracks_select_published_or_own" ON public.tracks FOR SELECT USING (
+  status = 'published' OR
   auth.uid() IN (SELECT profile_id FROM public.artists WHERE id = artist_id)
 );
 CREATE POLICY "tracks_insert_own" ON public.tracks FOR INSERT WITH CHECK (

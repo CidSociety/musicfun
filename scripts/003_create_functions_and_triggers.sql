@@ -1,6 +1,33 @@
--- Functions and triggers for the music platform
+/*
+  # Database Functions and Triggers
 
--- Function to handle new user signup
+  ## Core Features
+  - Automatic user profile creation on signup
+  - Real-time count updates (plays, likes, followers)
+  - Analytics recording and aggregation
+  - Notification system integration
+  - Data integrity maintenance through triggers
+
+  ## Trigger Categories
+  1. User Management - Profile creation, role assignments
+  2. Content Counters - Play counts, likes, follower counts
+  3. Analytics - Activity tracking and metrics
+  4. Notifications - Real-time user alerts
+  5. Data Integrity - Referential integrity, cascade updates
+*/
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+-- Function to handle new user signup with enhanced profile creation
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -8,14 +35,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, username, display_name)
+  INSERT INTO public.profiles (id, username, display_name, full_name)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data ->> 'username', NULL),
-    COALESCE(NEW.raw_user_meta_data ->> 'display_name', NEW.email)
+    COALESCE(NEW.raw_user_meta_data ->> 'display_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data ->> 'full_name', NULL)
   )
   ON CONFLICT (id) DO NOTHING;
-  
+
   RETURN NEW;
 END;
 $$;
@@ -230,3 +258,56 @@ BEGIN
     (SELECT stage_name FROM artist_stats) as top_artist_name;
 END;
 $$;
+
+-- =====================================================
+-- UPDATED_AT TRIGGERS
+-- =====================================================
+
+-- Add updated_at triggers to all relevant tables
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
+CREATE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_artists_updated_at ON public.artists;
+CREATE TRIGGER update_artists_updated_at
+  BEFORE UPDATE ON public.artists
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_albums_updated_at ON public.albums;
+CREATE TRIGGER update_albums_updated_at
+  BEFORE UPDATE ON public.albums
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_tracks_updated_at ON public.tracks;
+CREATE TRIGGER update_tracks_updated_at
+  BEFORE UPDATE ON public.tracks
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_playlists_updated_at ON public.playlists;
+CREATE TRIGGER update_playlists_updated_at
+  BEFORE UPDATE ON public.playlists
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_venues_updated_at ON public.venues;
+CREATE TRIGGER update_venues_updated_at
+  BEFORE UPDATE ON public.venues
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_events_updated_at ON public.events;
+CREATE TRIGGER update_events_updated_at
+  BEFORE UPDATE ON public.events
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
+
+DROP TRIGGER IF EXISTS update_comments_updated_at ON public.comments;
+CREATE TRIGGER update_comments_updated_at
+  BEFORE UPDATE ON public.comments
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_updated_at();
